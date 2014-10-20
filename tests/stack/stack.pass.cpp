@@ -1,5 +1,5 @@
 #include <iostream>
-#include "stack.hpp"
+#include "hardcore/stack.hpp"
 
 void req(int depth)
 {

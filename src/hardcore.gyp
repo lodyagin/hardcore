@@ -2,7 +2,7 @@
   'targets': [
      {
        'target_name': 'hardcore',
-       'type': '<(library)',
+       'type': 'static_library',
        'include_dirs': [
          '../include',
        ],
