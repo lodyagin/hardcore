@@ -58,6 +58,7 @@ public:
   using difference_type = std::ptrdiff_t;
   using value_type = type;
   using reference = type;
+  using pointer = type*;
   using const_pointer = const type*;
   using iterator_category = std::forward_iterator_tag;
 
@@ -90,6 +91,18 @@ public:
     iterator copy = *this;
     operator++();
     return copy;
+  }
+
+  iterator& operator+=(size_t k)
+  {
+    std::advance(*this, k);
+    return *this;
+  }
+
+  iterator operator+(size_t k)
+  {
+    iterator res = *this;
+    return res += k;
   }
 
   reference operator*() const
