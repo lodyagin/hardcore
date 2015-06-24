@@ -15,6 +15,8 @@
 #include <cstddef>
 #include <cassert>
 #include <iterator>
+#include <cassert>
+#include <sys/resource.h>
 
 extern void* __libc_stack_end;
 
@@ -74,17 +76,7 @@ public:
     return !operator==(o);
   }
 
-  iterator& operator++()
-  {
-    if (__builtin_expect(fp == nullptr, 0)) {
-      ip = nullptr;
-    }
-    else {
-      ip = fp->ret;
-      fp = fp->up;
-    }
-    return *this;
-  }
+  inline iterator& operator++();
  
   iterator operator++(int)
   {
@@ -115,7 +107,6 @@ public:
     return this;
   }
 
-protected:
 #if 0
   iterator(const link* fp_, pointer ip_)
     __attribute__ ((always_inline))
@@ -126,6 +117,12 @@ protected:
     : type(t)
   {}
 #endif
+
+static ptrdiff_t frame_offset(fp_type fp)
+{
+    return (char*)fp - (char*)__libc_stack_end;
+}
+
 };
 
 } // stack_
@@ -155,8 +152,27 @@ protected:
   }
 
 public:
+  static size_t max_size()
+  {
+      static size_t stack_size = 0;
+
+      if (stack_size == 0)
+      {
+          struct rlimit rl;
+          if (getrlimit(RLIMIT_STACK, &rl) != 0)
+          {
+              assert(false);
+              exit(1); // must never happen
+          }
+
+          stack_size = rl.rlim_cur;
+      }
+  }
+
 #if 1
-  stack() : type{nullptr, nullptr} {}
+  stack() noexcept : type{nullptr, nullptr}
+  {
+  }
 #else
   // problem with optimization, try to compile 
   // 7c4121f02ed3e2bd with -O3 (gcc 4.9.1)
@@ -202,6 +218,36 @@ public:
 
 std::ostream&
 operator<<(std::ostream& out, const stack::ips& ips);
+
+namespace stack_ {
+
+inline iterator& iterator::operator++()
+{
+  if (__builtin_expect(fp == nullptr, 0)) {
+    ip = nullptr;
+  }
+  else {
+    const ptrdiff_t fo = frame_offset(fp->up);
+    if (// step out of stack boundaries
+           __builtin_expect(fo > 0, 0)
+        || __builtin_expect(fo < -hc::stack::max_size(), 0)
+        // broken stack
+        || __builtin_expect(fp->up <= fp, 0)
+        )
+    {
+      // end()
+      ip = nullptr; 
+      fp = nullptr;
+    }
+    else {
+      ip = fp->ret;
+      fp = fp->up;
+    }
+  }
+  return *this;
+}
+
+} // stack_
 
 } // hc
 
