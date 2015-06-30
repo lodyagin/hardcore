@@ -50,19 +50,31 @@ struct type
 
   fp_type fp;
   ip_type ip;
+
+  operator fp_type() const
+  {
+    return fp;
+  }
+
+  operator ip_type() const
+  {
+    return ip;
+  }
 };
 
+template<class Value>
 class iterator : protected type
 {
   friend class hc::stack;
 
 public:
-  using difference_type = std::ptrdiff_t;
-  using value_type = type;
-  using reference = type;
-  using pointer = type*;
-  using const_pointer = const type*;
   using iterator_category = std::forward_iterator_tag;
+  using size_type = std::size_t;
+  using difference_type = std::ptrdiff_t;
+  using value_type = Value;
+  using reference = Value;
+  using pointer = value_type*;
+  using const_pointer = const value_type*;
 
   constexpr iterator() : type{nullptr, nullptr} {}
 
@@ -99,12 +111,17 @@ public:
 
   reference operator*() const
   {
-    return *this;
+    return (reference) *this;
   }
 
-  const_pointer operator->() const
+  /*const_pointer operator->() const
   {
     return this;
+  }*/
+
+  bool is_end() const
+  {
+    return fp == nullptr;
   }
 
 #if 0
@@ -118,12 +135,12 @@ public:
   {}
 #endif
 
-static ptrdiff_t frame_offset(fp_type fp)
+};
+
+static ptrdiff_t frame_offset(type::fp_type fp)
 {
     return (char*)fp - (char*)__libc_stack_end;
 }
-
-};
 
 } // stack_
 
@@ -135,13 +152,15 @@ class stack : protected stack_::type
 {
 public:
   using difference_type = std::ptrdiff_t;
-  using size_type = std::size_t;
-  using iterator = stack_::iterator;
-  using value_type = iterator::type;
+  using value_type = stack_::type;
+  using iterator = stack_::iterator<value_type>;
   using reference = iterator::reference;
+  using size_type = typename iterator::size_type;
 
   using typename stack_::type::fp_type;
   using typename stack_::type::ip_type;
+
+  using ip_iterator = stack_::iterator<ip_type>;
 
 protected:
   //! The caller's instruction pointer
@@ -167,6 +186,7 @@ public:
 
           stack_size = rl.rlim_cur;
       }
+      return stack_size;
   }
 
 #if 1
@@ -201,9 +221,27 @@ public:
     return top();
   }
 
+  static ip_iterator ip_begin() __attribute__ ((always_inline))
+  {
+    return top();
+  }
+
   iterator end()
   {
     return iterator();
+  }
+
+  ip_iterator ip_end()
+  {
+    return ip_iterator();
+  }
+
+  static bool is_valid_frame(stack_::type::fp_type frame)
+  {
+    const ptrdiff_t fo = hc::stack_::frame_offset(frame);
+    return (   
+        __builtin_expect(fo <= 0, 1)
+     && __builtin_expect(fo >= -(ptrdiff_t) hc::stack::max_size(), 1));
   }
 
   //! Marker type for output ips only
@@ -221,17 +259,16 @@ operator<<(std::ostream& out, const stack::ips& ips);
 
 namespace stack_ {
 
-inline iterator& iterator::operator++()
+template<class Value>
+iterator<Value>& iterator<Value>::operator++()
 {
   if (__builtin_expect(fp == nullptr, 0)) {
     ip = nullptr;
   }
   else {
-    const ptrdiff_t fo = frame_offset(fp->up);
-    if (// step out of stack boundaries
-           __builtin_expect(fo > 0, 0)
-        || __builtin_expect(fo < -hc::stack::max_size(), 0)
-        // broken stack
+    if (// broken stack
+           !stack::is_valid_frame(fp)
+        || !stack::is_valid_frame(fp->up)
         || __builtin_expect(fp->up <= fp, 0)
         )
     {
