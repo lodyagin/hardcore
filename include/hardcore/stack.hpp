@@ -109,6 +109,18 @@ public:
     return res += k;
   }
 
+  // advance the iterator without any checking
+  iterator& advance_unchecked(size_t k)
+  {
+    while (k != 0)
+    {
+      ip = fp->ret;
+      fp = fp->up;
+      k--;
+    }
+    return *this;
+  }
+
   reference operator*() const
   {
     return (reference) *this;
