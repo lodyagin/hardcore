@@ -75,6 +75,14 @@ public:
   using reference = Value;
   using pointer = value_type*;
   using const_pointer = const value_type*;
+  // some additional properties
+  static constexpr bool stick_on_last = true; // ++ never
+                                              // forwards
+                                              // after the
+                                              // end
+
+  static constexpr bool safe_last_dereference = true; 
+  // *end() will return some value 
 
   constexpr iterator() : type{nullptr, nullptr} {}
 
@@ -147,6 +155,12 @@ public:
   {}
 #endif
 
+  // move it forward not more than limit and
+  // calls `fun' for each element.
+  template<class Fun>
+  size_t trail(size_t limit, Fun fun);
+
+  inline size_t trail(size_t limit, Value* fun);
 };
 
 static ptrdiff_t frame_offset(type::fp_type fp)
@@ -218,8 +232,14 @@ public:
 
   stack(const stack_::type& o) : type(o) {}
 
-  //! The current frame (top of the stack)
+  //! top of the stack = the frame of the caller
   static reference top() __attribute__ ((noinline))
+  {
+    return top_inline();
+  }
+
+  //! the frame of the first not-inlined caller's parent
+  static reference top_inline() __attribute__ ((always_inline))
   {
     return type{
       (fp_type) __builtin_frame_address(1),
@@ -227,15 +247,27 @@ public:
     };
   }
 
-  //! returns iterator to top element
+  //! returns iterator to the frame of the caller
   static iterator begin() __attribute__ ((always_inline))
   {
     return top();
   }
 
+  //! returns iterator to the frame of the first
+  //! not-inlined caller's parent
+  static iterator parent_begin() __attribute__ ((always_inline))
+  {
+    return top_inline();
+  }
+
   static ip_iterator ip_begin() __attribute__ ((always_inline))
   {
     return top();
+  }
+
+  static ip_iterator ip_parent_begin() __attribute__ ((always_inline))
+  {
+    return top_inline();
   }
 
   iterator end()
@@ -278,10 +310,15 @@ iterator<Value>& iterator<Value>::operator++()
     ip = nullptr;
   }
   else {
-    if (// broken stack
+    if (
+#ifndef SKIP_STACK_INTEGRITY_CHECK
+        // broken stack
            !stack::is_valid_frame(fp)
         || !stack::is_valid_frame(fp->up)
         || __builtin_expect(fp->up <= fp, 0)
+#else
+        false
+#endif
         )
     {
       // end()
@@ -294,6 +331,52 @@ iterator<Value>& iterator<Value>::operator++()
     }
   }
   return *this;
+}
+
+template<class Value>
+template<class Fun>
+size_t iterator<Value>::trail(size_t limit, Fun fun)
+{
+  size_t cnt = 0;
+
+  if (__builtin_expect(!stack::is_valid_frame(fp), 0))
+  {
+    return cnt;
+  }
+
+  while (
+       __builtin_expect(cnt < limit, 1)
+    && __builtin_expect(stack::is_valid_frame(fp->up), 1)
+    && __builtin_expect(fp->up > fp, 1)
+  )
+  {
+    fun((Value) fp);
+    cnt++;
+    fp = fp->up;
+  }
+  return cnt;
+}
+
+template<class Value>
+size_t iterator<Value>::trail(size_t limit, Value* v)
+{
+  size_t cnt = 0;
+
+  if (__builtin_expect(!stack::is_valid_frame(fp), 0))
+  {
+    return cnt;
+  }
+
+  while (
+       __builtin_expect(cnt < limit, 1)
+    && __builtin_expect(stack::is_valid_frame(fp->up), 1)
+    && __builtin_expect(fp->up > fp, 1)
+  )
+  {
+    v[cnt++] = (Value) fp;
+    fp = fp->up;
+  }
+  return cnt;
 }
 
 } // stack_
