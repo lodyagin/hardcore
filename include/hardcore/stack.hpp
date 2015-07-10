@@ -154,13 +154,6 @@ public:
     : type(t)
   {}
 #endif
-
-  // move it forward not more than limit and
-  // calls `fun' for each element.
-  template<class Fun>
-  size_t trail(size_t limit, Fun fun);
-
-  inline size_t trail(size_t limit, Value* fun);
 };
 
 static ptrdiff_t frame_offset(type::fp_type fp)
@@ -317,7 +310,7 @@ iterator<Value>& iterator<Value>::operator++()
         || !stack::is_valid_frame(fp->up)
         || __builtin_expect(fp->up <= fp, 0)
 #else
-        false
+        !stack::is_valid_frame(fp)
 #endif
         )
     {
@@ -331,52 +324,6 @@ iterator<Value>& iterator<Value>::operator++()
     }
   }
   return *this;
-}
-
-template<class Value>
-template<class Fun>
-size_t iterator<Value>::trail(size_t limit, Fun fun)
-{
-  size_t cnt = 0;
-
-  if (__builtin_expect(!stack::is_valid_frame(fp), 0))
-  {
-    return cnt;
-  }
-
-  while (
-       __builtin_expect(cnt < limit, 1)
-    && __builtin_expect(stack::is_valid_frame(fp->up), 1)
-    && __builtin_expect(fp->up > fp, 1)
-  )
-  {
-    fun((Value) fp);
-    cnt++;
-    fp = fp->up;
-  }
-  return cnt;
-}
-
-template<class Value>
-size_t iterator<Value>::trail(size_t limit, Value* v)
-{
-  size_t cnt = 0;
-
-  if (__builtin_expect(!stack::is_valid_frame(fp), 0))
-  {
-    return cnt;
-  }
-
-  while (
-       __builtin_expect(cnt < limit, 1)
-    && __builtin_expect(stack::is_valid_frame(fp->up), 1)
-    && __builtin_expect(fp->up > fp, 1)
-  )
-  {
-    v[cnt++] = (Value) fp;
-    fp = fp->up;
-  }
-  return cnt;
 }
 
 } // stack_
