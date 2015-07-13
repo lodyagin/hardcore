@@ -217,7 +217,9 @@ public:
       }
   {}
 
-  stack(stack_::type&& o) : type(o) {}
+  stack(stack_::type&& o) noexcept : type(o) {}
+
+  stack(stack&& o) noexcept : type(o) {}
 
   // disable to store (copy in memory) it
   stack(const stack&) = delete;
@@ -283,7 +285,11 @@ public:
 
 struct stack::ips : stack
 {
+    typedef ip_iterator iterator;
+
     using stack::stack;
+
+    //ips(ips&& o) noexcept : stack((stack&&)std::move(o)) {}
 
     ip_iterator begin() const
     {
