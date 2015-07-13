@@ -220,12 +220,16 @@ public:
   stack(stack_::type&& o) : type(o) {}
 
   // disable to store (copy in memory) it
-  stack(const stack_::type&) = delete;
+  stack(const stack&) = delete;
 
   stack& operator=(stack_::type&& o)
   {
     ((stack_::type&) *this).operator=(o);
+    return *this;
   }
+
+  // disable to store (copy in memory) it
+  stack& operator=(const stack&) = delete;
 
   //! top of the stack = the frame of the constructor caller
   reference top() const
