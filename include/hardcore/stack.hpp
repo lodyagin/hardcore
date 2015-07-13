@@ -165,8 +165,6 @@ static ptrdiff_t frame_offset(type::fp_type fp)
 
 //! The current stack. You can pass this object to
 //! underlying functions but never can return it.
-//! @tparam limit browsable stack size
-//template<std::size_t limit = 35> TODO
 class stack : protected stack_::type
 {
 public:
@@ -246,6 +244,12 @@ public:
     return top();
   }
 
+  //! returns iterator to the frame of the caller
+  static iterator cbegin() __attribute__ ((always_inline))
+  {
+    return begin();
+  }
+
   //! returns iterator to the frame of the first
   //! not-inlined caller's parent
   static iterator parent_begin() __attribute__ ((always_inline))
@@ -263,12 +267,17 @@ public:
     return top_inline();
   }
 
-  iterator end()
+  static iterator end()
   {
     return iterator();
   }
 
-  ip_iterator ip_end()
+  static iterator cend()
+  {
+    return end();
+  }
+
+  static ip_iterator ip_end()
   {
     return ip_iterator();
   }
@@ -281,13 +290,36 @@ public:
      && __builtin_expect(fo >= -(ptrdiff_t) hc::stack::max_size(), 1));
   }
 
-  //! Marker type for output ips only
+  //! ips part only
   struct ips
   {
+#if 0
+    // the instance is only for stream output
     ips()__attribute__((__always_inline__))
       : bg(stack().begin()) {}
 
     iterator bg;
+#endif
+
+    static ip_iterator begin() __attribute__ ((always_inline))
+    {
+        return ip_begin();
+    }
+
+    static ip_iterator cbegin() __attribute__ ((always_inline))
+    {
+        return ip_begin();
+    }
+
+    static ip_iterator end() __attribute__ ((always_inline))
+    {
+        return ip_end();
+    }
+
+    static ip_iterator cend() __attribute__ ((always_inline))
+    {
+        return ip_end();
+    }
   };
 };
 

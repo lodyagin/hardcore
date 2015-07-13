@@ -3,3 +3,4 @@
 *.mk
 *Makefile
 out/
+*.a

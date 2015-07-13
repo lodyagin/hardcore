@@ -20,8 +20,8 @@ operator<<(std::ostream& out, const stack::ips& ips)
   const auto save = out.setf
     (ios_base::hex, ios_base::basefield);
   try {
-    for (auto it = ips.bg; it!= stack(*ips.bg).end(); ++it)
-      out << (void*) it->ip << ' ';
+    for (auto v : ips)
+      out << (void*) v << ' ';
   }
   catch(...)
   {
