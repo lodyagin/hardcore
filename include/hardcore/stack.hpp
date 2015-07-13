@@ -164,7 +164,8 @@ static ptrdiff_t frame_offset(type::fp_type fp)
 } // stack_
 
 //! The current stack. You can pass this object to
-//! underlying functions but never can return it.
+//! underlying functions but never can return or
+//! store it.
 class stack : protected stack_::type
 {
 public:
@@ -206,65 +207,47 @@ public:
       return stack_size;
   }
 
-#if 1
-  stack() noexcept : type{nullptr, nullptr}
-  {
-  }
-#else
-  // problem with optimization, try to compile 
-  // 7c4121f02ed3e2bd with -O3 (gcc 4.9.1)
+  // there is some problem with optimization with gcc 4.9.1
+  // here, so try to use 'static' version from git for 
+  // that case
   stack() __attribute__ ((always_inline))
     : type{
         (fp_type) __builtin_frame_address(0),
         (ip_type) callers_ip()
       }
   {}
-#endif
 
-  stack(const stack_::type& o) : type(o) {}
+  stack(stack_::type&& o) : type(o) {}
 
-  //! top of the stack = the frame of the caller
-  static reference top() __attribute__ ((noinline))
+  // disable to store (copy in memory) it
+  stack(const stack_::type&) = delete;
+
+  stack& operator=(stack_::type&& o)
   {
-    return top_inline();
+    ((stack_::type&) *this).operator=(o);
   }
 
-  //! the frame of the first not-inlined caller's parent
-  static reference top_inline() __attribute__ ((always_inline))
+  //! top of the stack = the frame of the constructor caller
+  reference top() const
   {
-    return type{
-      (fp_type) __builtin_frame_address(1),
-      (ip_type) callers_ip()
-    };
+    return *this;
   }
 
-  //! returns iterator to the frame of the caller
-  static iterator begin() __attribute__ ((always_inline))
+  //! returns iterator to the frame of the constructor caller
+  iterator begin() const
   {
     return top();
   }
 
-  //! returns iterator to the frame of the caller
-  static iterator cbegin() __attribute__ ((always_inline))
-  {
-    return begin();
-  }
-
-  //! returns iterator to the frame of the first
-  //! not-inlined caller's parent
-  static iterator parent_begin() __attribute__ ((always_inline))
-  {
-    return top_inline();
-  }
-
-  static ip_iterator ip_begin() __attribute__ ((always_inline))
+  //! returns iterator to the frame of the constructor caller
+  iterator cbegin() const
   {
     return top();
   }
 
-  static ip_iterator ip_parent_begin() __attribute__ ((always_inline))
+  ip_iterator ip_begin() const
   {
-    return top_inline();
+    return top();
   }
 
   static iterator end()
@@ -272,9 +255,9 @@ public:
     return iterator();
   }
 
-  static iterator cend()
+  static iterator cend() 
   {
-    return end();
+    return iterator();
   }
 
   static ip_iterator ip_end()
@@ -291,36 +274,32 @@ public:
   }
 
   //! ips part only
-  struct ips
-  {
-#if 0
-    // the instance is only for stream output
-    ips()__attribute__((__always_inline__))
-      : bg(stack().begin()) {}
+  struct ips;
+};
 
-    iterator bg;
-#endif
+struct stack::ips : stack
+{
+    using stack::stack;
 
-    static ip_iterator begin() __attribute__ ((always_inline))
+    ip_iterator begin() const
     {
         return ip_begin();
     }
 
-    static ip_iterator cbegin() __attribute__ ((always_inline))
+    ip_iterator cbegin() const
     {
         return ip_begin();
     }
 
-    static ip_iterator end() __attribute__ ((always_inline))
+    static ip_iterator end()
     {
-        return ip_end();
+        return stack::ip_end();
     }
 
-    static ip_iterator cend() __attribute__ ((always_inline))
+    static ip_iterator cend()
     {
-        return ip_end();
+        return stack::ip_end();
     }
-  };
 };
 
 std::ostream&
